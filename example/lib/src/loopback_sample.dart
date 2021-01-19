@@ -17,7 +17,7 @@ class _MyAppState extends State<LoopBackSample> {
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
   bool _inCalling = false;
-  //Timer _timer;
+  Timer _timer;
 
   @override
   void initState() {
@@ -42,6 +42,7 @@ class _MyAppState extends State<LoopBackSample> {
 
   void handleStatsReport(Timer timer) async {
     if (_peerConnection != null) {
+/*
       var reports = await _peerConnection.getStats();
       reports.forEach((report) {
         print('report => { ');
@@ -55,6 +56,18 @@ class _MyAppState extends State<LoopBackSample> {
         print('    }');
         print('}');
       });
+*/
+      /*
+      var senders = await _peerConnection.getSenders();
+      var canInsertDTMF = await senders[0].dtmfSender.canInsertDtmf();
+      print(canInsertDTMF);
+      await senders[0].dtmfSender.insertDTMF('1');
+      var receivers = await _peerConnection.getReceivers();
+      print(receivers[0].track.id);
+      var transceivers = await _peerConnection.getTransceivers();
+      print(transceivers[0].sender.parameters);
+      print(transceivers[0].receiver.parameters);
+      */
     }
   }
 
@@ -70,6 +83,10 @@ class _MyAppState extends State<LoopBackSample> {
     print(state);
   }
 
+  void _onPeerConnectionState(RTCPeerConnectionState state) {
+    print(state);
+  }
+
   void _onAddStream(MediaStream stream) {
     print('New stream: ' + stream.id);
     //_remoteRenderer.srcObject = stream;
@@ -80,6 +97,10 @@ class _MyAppState extends State<LoopBackSample> {
   }
 
   void _onCandidate(RTCIceCandidate candidate) {
+    if (candidate == null) {
+      print('onCandidate: complete!');
+      return;
+    }
     print('onCandidate: ' + candidate.candidate);
     _peerConnection.addCandidate(candidate);
   }
@@ -143,6 +164,7 @@ class _MyAppState extends State<LoopBackSample> {
       _peerConnection.onSignalingState = _onSignalingState;
       _peerConnection.onIceGatheringState = _onIceGatheringState;
       _peerConnection.onIceConnectionState = _onIceConnectionState;
+      _peerConnection.onConnectionState = _onPeerConnectionState;
       _peerConnection.onAddStream = _onAddStream;
       _peerConnection.onRemoveStream = _onRemoveStream;
       _peerConnection.onIceCandidate = _onCandidate;
@@ -156,14 +178,6 @@ class _MyAppState extends State<LoopBackSample> {
 
       /* old API
       await _peerConnection.addStream(_localStream);
-      // or
-      var rtpSender =
-          await _peerConnection.createSender('audio', _localStream.id);
-      await rtpSender.setTrack(_localStream.getAudioTracks()[0]);
-      rtpSender = await _peerConnection.createSender('video', _localStream.id);
-      await rtpSender.setTrack(_localStream.getVideoTracks()[0]);
-      */
-      /*
       // Unified-Plan
       _localStream.getTracks().forEach((track) {
         _peerConnection.addTrack(track, [_localStream]);
@@ -177,14 +191,15 @@ class _MyAppState extends State<LoopBackSample> {
             direction: TransceiverDirection.SendRecv, streams: [_localStream]),
       );
 
+      /*
       // ignore: unused_local_variable
       var transceiver = await _peerConnection.addTransceiver(
         track: _localStream.getVideoTracks()[0],
         init: RTCRtpTransceiverInit(
             direction: TransceiverDirection.SendRecv, streams: [_localStream]),
       );
+      */
 
-      /*
       // Unified-Plan Simulcast
       await _peerConnection.addTransceiver(
           track: _localStream.getVideoTracks()[0],
@@ -195,24 +210,24 @@ class _MyAppState extends State<LoopBackSample> {
               // for firefox order matters... first high resolution, then scaled resolutions...
               RTCRtpEncoding(
                 rid: 'f',
-                maxBitrateBps: 900000,
+                maxBitrate: 900000,
                 numTemporalLayers: 3,
               ),
               RTCRtpEncoding(
                 rid: 'h',
                 numTemporalLayers: 3,
-                maxBitrateBps: 300000,
+                maxBitrate: 300000,
                 scaleResolutionDownBy: 2.0,
               ),
               RTCRtpEncoding(
                 rid: 'q',
                 numTemporalLayers: 3,
-                maxBitrateBps: 100000,
+                maxBitrate: 100000,
                 scaleResolutionDownBy: 4.0,
               ),
             ],
           ));
-
+      /*
       await _peerConnection.addTransceiver(
           kind: RTCRtpMediaType.RTCRtpMediaTypeVideo);
       await _peerConnection.addTransceiver(
@@ -242,7 +257,7 @@ class _MyAppState extends State<LoopBackSample> {
     }
     if (!mounted) return;
 
-    //_timer = Timer.periodic(Duration(seconds: 1), handleStatsReport);
+    _timer = Timer.periodic(Duration(seconds: 1), handleStatsReport);
 
     setState(() {
       _inCalling = true;
@@ -262,7 +277,7 @@ class _MyAppState extends State<LoopBackSample> {
     setState(() {
       _inCalling = false;
     });
-    //_timer.cancel();
+    _timer.cancel();
   }
 
   void _sendDtmf() async {

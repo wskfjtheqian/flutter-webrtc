@@ -6,7 +6,7 @@ import 'interface/media_stream_track.dart';
 
 class MediaRecorder extends _interface.MediaRecorder {
   MediaRecorder() : _delegate = mediaRecorder();
-  final MediaRecorder _delegate;
+  final _interface.MediaRecorder _delegate;
 
   @override
   Future<void> start(String path,
@@ -22,5 +22,6 @@ class MediaRecorder extends _interface.MediaRecorder {
     Function(dynamic blob, bool isLastOne) onDataChunk,
     String mimeType,
   }) =>
-      _delegate.startWeb(stream, onDataChunk: onDataChunk, mimeType: mimeType);
+      _delegate.startWeb(stream,
+          onDataChunk: onDataChunk, mimeType: mimeType ?? 'video/webm');
 }

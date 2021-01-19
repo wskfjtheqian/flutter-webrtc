@@ -10,13 +10,16 @@ class RTCVideoView extends StatefulWidget {
     Key key,
     this.objectFit = RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
     this.mirror = false,
+    this.filterQuality = FilterQuality.low,
   })  : assert(objectFit != null),
         assert(mirror != null),
+        assert(filterQuality != null),
         super(key: key);
 
   final RTCVideoRenderer _renderer;
   final RTCVideoViewObjectFit objectFit;
   final bool mirror;
+  final FilterQuality filterQuality;
   @override
   _RTCVideoViewState createState() => _RTCVideoViewState();
 }
@@ -28,12 +31,14 @@ class _RTCVideoViewState extends State<RTCVideoView> {
   @override
   void initState() {
     super.initState();
-    widget._renderer?.delegate?.addListener(() => setState(() {}));
+    widget._renderer?.delegate?.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   Widget buildVideoElementView(RTCVideoViewObjectFit objFit, bool mirror) {
-    // TODO(cloudwebrtc): Add css style for mirror.
-    videoRenderer.videoElement.style.objectFit =
+    videoRenderer.mirror = mirror;
+    videoRenderer.objectFit =
         objFit == RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
             ? 'contain'
             : 'cover';

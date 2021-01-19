@@ -8,7 +8,13 @@ class RTCVideoRenderer {
 
   VideoRenderer get delegate => _delegate;
 
+  set onResize(Function func) => _delegate.onResize = func;
+
   Future<void> initialize() => _delegate.initialize();
+
+  int get videoWidth => _delegate.videoWidth;
+
+  int get videoHeight => _delegate.videoHeight;
 
   bool get renderVideo => _delegate.renderVideo;
 
@@ -17,6 +23,8 @@ class RTCVideoRenderer {
   MediaStream get srcObject => _delegate.srcObject;
 
   set muted(bool mute) => _delegate.muted = mute;
+
+  set audioOutput(String deviceId) => _delegate.audioOutput(deviceId);
 
   set srcObject(MediaStream stream) => _delegate.srcObject = stream;
 

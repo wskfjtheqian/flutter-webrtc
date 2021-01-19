@@ -38,13 +38,15 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
   private BinaryMessenger messenger;
   private final String id;
   private PeerConnection peerConnection;
+  private PeerConnection.RTCConfiguration configuration;
   final Map<String, MediaStream> remoteStreams = new HashMap<>();
   final Map<String, MediaStreamTrack> remoteTracks = new HashMap<>();
   private final StateProvider stateProvider;
   private final EventChannel eventChannel;
   private EventChannel.EventSink eventSink;
 
-  PeerConnectionObserver(StateProvider stateProvider, BinaryMessenger messenger, String id) {
+  PeerConnectionObserver(PeerConnection.RTCConfiguration configuration, StateProvider stateProvider, BinaryMessenger messenger, String id) {
+    this.configuration = configuration;
     this.stateProvider = stateProvider;
     this.messenger = messenger;
     this.id = id;
@@ -99,9 +101,6 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
       if (config.hasKey("ordered")) {
         init.ordered = config.getBoolean("ordered");
       }
-      if (config.hasKey("maxRetransmitTime")) {
-        init.maxRetransmitTimeMs = config.getInt("maxRetransmitTime");
-      }
       if (config.hasKey("maxRetransmits")) {
         init.maxRetransmits = config.getInt("maxRetransmits");
       }
@@ -154,7 +153,7 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
     RtpTransceiver getRtpTransceiverById(String id) {
         List<RtpTransceiver> transceivers = peerConnection.getTransceivers();
         for(RtpTransceiver transceiver : transceivers) {
-            if (id == transceiver.getMid()){
+            if (id.equals(transceiver.getMid())){
                 return transceiver;
             }
         }
@@ -164,7 +163,7 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
     RtpSender getRtpSenderById(String id) {
         List<RtpSender> senders = peerConnection.getSenders();
         for(RtpSender sender : senders) {
-            if (id == sender.id()){
+            if (id.equals(sender.id())){
                 return sender;
             }
         }
@@ -174,7 +173,7 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
     RtpReceiver getRtpReceiverById(String id) {
         List<RtpReceiver> receivers = peerConnection.getReceivers();
         for(RtpReceiver receiver : receivers) {
-            if (id == receiver.id()){
+            if (id.equals(receiver.id())){
                 return receiver;
             }
         }
@@ -353,7 +352,6 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
     sendEvent(params);
   }
 
-
   void sendEvent(ConstraintsMap event) {
     if (eventSink != null) {
       eventSink.success(event.toMap());
@@ -430,11 +428,13 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
       params.putMap("track", mediaTrackToMap(receiver.track()));
       params.putMap("receiver", rtpReceiverToMap(receiver));
 
-      List<RtpTransceiver> transceivers = peerConnection.getTransceivers();
-      for( RtpTransceiver transceiver : transceivers ) {
-            if(transceiver.getReceiver() != null && receiver.id().equals(transceiver.getReceiver().id())) {
-                params.putMap("transceiver", transceiverToMap(transceiver));
-            }
+      if(this.configuration.sdpSemantics == PeerConnection.SdpSemantics.UNIFIED_PLAN) {
+          List<RtpTransceiver> transceivers = peerConnection.getTransceivers();
+          for( RtpTransceiver transceiver : transceivers ) {
+              if(transceiver.getReceiver() != null && receiver.id().equals(transceiver.getReceiver().id())) {
+                  params.putMap("transceiver", transceiverToMap(transceiver));
+              }
+          }
       }
       sendEvent(params);
   }
@@ -498,16 +498,16 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
     sendEvent(params);
   }
 
-    @Override
-    public void onConnectionChange(PeerConnection.PeerConnectionState connectionState) {
-        Log.d(TAG, "onConnectionChange" + connectionState.name());
-        ConstraintsMap params = new ConstraintsMap();
-        params.putString("event", "peerConnectionState");
-        params.putString("state", connectionStateString(connectionState));
-        sendEvent(params);
-    }
+  @Override
+  public void onConnectionChange(PeerConnection.PeerConnectionState connectionState) {
+    Log.d(TAG, "onConnectionChange" + connectionState.name());
+    ConstraintsMap params = new ConstraintsMap();
+    params.putString("event", "peerConnectionState");
+    params.putString("state", connectionStateString(connectionState));
+    sendEvent(params);
+  }
 
-    @Nullable
+  @Nullable
   private String iceConnectionStateString(PeerConnection.IceConnectionState iceConnectionState) {
     switch (iceConnectionState) {
       case NEW:
@@ -628,12 +628,12 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
           encoding.ssrc = ((Integer) parameters.get("ssrc")).longValue();
       }
 
-      if( parameters.get("minBitrateBps") != null) {
-          encoding.minBitrateBps = (Integer) parameters.get("minBitrateBps");
+      if( parameters.get("minBitrate") != null) {
+          encoding.minBitrateBps = (Integer) parameters.get("minBitrate");
       }
 
-      if( parameters.get("maxBitrateBps") != null) {
-          encoding.maxBitrateBps = (Integer) parameters.get("maxBitrateBps");
+      if( parameters.get("maxBitrate") != null) {
+          encoding.maxBitrateBps = (Integer) parameters.get("maxBitrate");
       }
 
       if( parameters.get("maxFramerate") != null) {
@@ -657,10 +657,19 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
       String direction = (String)parameters.get("direction");
       List<RtpParameters.Encoding> sendEncodings = new ArrayList<>();
       RtpTransceiver.RtpTransceiverInit init = null;
+
+      if(streamIds == null) {
+          streamIds = new ArrayList<String>();
+      }
+
+      if(direction == null) {
+          direction = "sendrecv";
+      }
+
       if(encodingsParams != null) {
           for (int i=0;i< encodingsParams.size();i++){
               Map<String, Object> params = encodingsParams.get(i);
-              sendEncodings.add(mapToEncoding(params));
+              sendEncodings.add(0, mapToEncoding(params));
           }
           init = new RtpTransceiver.RtpTransceiverInit(stringToTransceiverDirection(direction) ,streamIds, sendEncodings);
       } else {
@@ -669,9 +678,33 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
       return  init;
   }
 
-  private RtpParameters MapToRtpParameters(Map<String, Object> parameters) {
-      RtpParameters rtpParameters = null;
-      return rtpParameters;
+  private RtpParameters updateRtpParameters(Map<String, Object> newParameters, RtpParameters parameters){
+    List<Map<String, Object>> encodings = (List<Map<String, Object>>) newParameters.get("encodings");
+    final Iterator encodingsIterator = encodings.iterator();
+    final Iterator nativeEncodingsIterator = parameters.encodings.iterator();
+    while(encodingsIterator.hasNext() && nativeEncodingsIterator.hasNext()){
+      final RtpParameters.Encoding nativeEncoding = (RtpParameters.Encoding) nativeEncodingsIterator.next();
+      final Map<String, Object> encoding = (Map<String, Object>) encodingsIterator.next();
+      if(encoding.containsKey("active")){
+        nativeEncoding.active =  (Boolean) encoding.get("active");
+      }
+      if (encoding.containsKey("maxBitrate")) {
+        nativeEncoding.maxBitrateBps = (Integer) encoding.get("maxBitrate");
+      }
+      if (encoding.containsKey("minBitrate")) {
+        nativeEncoding.minBitrateBps = (Integer) encoding.get("minBitrate");
+      }
+      if (encoding.containsKey("maxFramerate")) {
+        nativeEncoding.maxFramerate = (Integer) encoding.get("maxFramerate");
+      }
+      if (encoding.containsKey("numTemporalLayers")) {
+        nativeEncoding.numTemporalLayers = (Integer) encoding.get("numTemporalLayers");
+      }
+      if (encoding.containsKey("scaleResolutionDownBy") ) {
+        nativeEncoding.scaleResolutionDownBy = (Double) encoding.get("scaleResolutionDownBy");
+      }
+    }
+    return parameters;
   }
 
   private Map<String, Object> rtpParametersToMap(RtpParameters rtpParameters){
@@ -698,10 +731,10 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
           ConstraintsMap map = new ConstraintsMap();
           map.putBoolean("active",encoding.active);
           if (encoding.maxBitrateBps != null) {
-              map.putInt("maxBitrateBps", encoding.maxBitrateBps);
+              map.putInt("maxBitrate", encoding.maxBitrateBps);
           }
           if (encoding.minBitrateBps != null) {
-              map.putInt("minBitrateBps", encoding.minBitrateBps);
+              map.putInt("minBitrate", encoding.minBitrateBps);
           }
           if (encoding.maxFramerate != null) {
               map.putInt("maxFramerate", encoding.maxFramerate);
@@ -776,7 +809,7 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
   private Map<String, Object> mediaTrackToMap(MediaStreamTrack track){
       ConstraintsMap info = new ConstraintsMap();
       if(track != null){
-          info.putString("trackId", track.id());
+          info.putString("id", track.id());
           info.putString("label",track.getClass() == VideoTrack.class? "video": "audio");
           info.putString("kind",track.kind());
           info.putBoolean("enabled", track.enabled());
@@ -829,19 +862,6 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
       candidateParams.putString("sdpMid", candidate.sdpMid);
       candidateParams.putString("candidate", candidate.sdp);
       return candidateParams.toMap();
-  }
-
-  public void createSender(String kind, String streamId, Result result){
-      RtpSender sender = peerConnection.createSender(kind, streamId);
-      result.success(rtpSenderToMap(sender));
-  }
-
-  public void closeSender(String senderId, Result result) {
-      RtpSender sender = getRtpSenderById(senderId);
-      sender.dispose();
-      Map<String, Object> params = new HashMap<>();
-      params.put("result", true);
-      result.success(params);
   }
 
   public void addTrack(MediaStreamTrack track, List<String> streamIds, Result result){
@@ -918,8 +938,11 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
             resultError("rtpSenderSetParameters", "sender is null", result);
             return;
         }
-        sender.setParameters(MapToRtpParameters(parameters));
-        result.success(null);
+        final RtpParameters updatedParameters = updateRtpParameters(parameters, sender.getParameters());
+        final Boolean success = sender.setParameters(updatedParameters);
+        ConstraintsMap params = new ConstraintsMap();
+        params.putBoolean("result", success);
+        result.success(params.toMap());
     }
 
     public void rtpSenderSetTrack(String rtpSenderId, MediaStreamTrack track, Result result, boolean replace) {
@@ -941,4 +964,53 @@ class PeerConnectionObserver implements PeerConnection.Observer, EventChannel.St
         sender.dispose();
         result.success(null);
     }
+
+    public void getSenders(Result result) {
+      List<RtpSender> senders = peerConnection.getSenders();
+      ConstraintsArray sendersParams = new ConstraintsArray();
+      for(RtpSender sender : senders){
+        sendersParams.pushMap(new ConstraintsMap(rtpSenderToMap(sender)));
+      }
+      ConstraintsMap params = new ConstraintsMap();
+      params.putArray("senders", sendersParams.toArrayList());
+      result.success(params.toMap());
+    }
+  
+    public void getReceivers(Result result) {
+      List<RtpReceiver> receivers = peerConnection.getReceivers();
+      ConstraintsArray receiversParams = new ConstraintsArray();
+      for(RtpReceiver receiver : receivers){
+        receiversParams.pushMap(new ConstraintsMap(rtpReceiverToMap(receiver)));
+      }
+      ConstraintsMap params = new ConstraintsMap();
+      params.putArray("receivers", receiversParams.toArrayList());
+      result.success(params.toMap());
+    }
+  
+    public void getTransceivers(Result result) {
+      List<RtpTransceiver> transceivers = peerConnection.getTransceivers();
+      ConstraintsArray transceiversParams = new ConstraintsArray();
+      for(RtpTransceiver receiver : transceivers){
+        transceiversParams.pushMap(new ConstraintsMap(transceiverToMap(receiver)));
+      }
+      ConstraintsMap params = new ConstraintsMap();
+      params.putArray("transceivers", transceiversParams.toArrayList());
+      result.success(params.toMap());
+    }
+
+    protected MediaStreamTrack getTransceiversTrack(String trackId) {
+        MediaStreamTrack track = null;
+        List<RtpTransceiver> transceivers = peerConnection.getTransceivers();
+        for (RtpTransceiver transceiver : transceivers) {
+            RtpReceiver receiver = transceiver.getReceiver();
+            if (receiver != null) {
+                if (receiver.track() != null && receiver.track().id().equals(trackId)) {
+                    track = receiver.track();
+                    break;
+                }
+            }
+        }
+        return track;
+    }
+
 }

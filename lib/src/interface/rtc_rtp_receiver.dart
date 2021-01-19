@@ -1,14 +1,15 @@
-import 'dart:async';
-
 import 'enums.dart';
 import 'media_stream_track.dart';
 import 'rtc_rtp_parameters.dart';
+import 'rtc_stats_report.dart';
 
 typedef OnFirstPacketReceivedCallback = void Function(
     RTCRtpReceiver rtpReceiver, RTCRtpMediaType mediaType);
 
 abstract class RTCRtpReceiver {
   RTCRtpReceiver();
+
+  Future<List<StatsReport>> getStats();
 
   /// public:
   OnFirstPacketReceivedCallback onFirstPacketReceived;
@@ -21,6 +22,4 @@ abstract class RTCRtpReceiver {
   MediaStreamTrack get track;
 
   String get receiverId;
-
-  Future<void> dispose();
 }

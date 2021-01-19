@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'enums.dart';
 import 'media_stream.dart';
 import 'media_stream_track.dart';
@@ -62,9 +64,10 @@ abstract class RTCPeerConnection {
 
   Future<void> setConfiguration(Map<String, dynamic> configuration);
 
-  Future<RTCSessionDescription> createOffer(Map<String, dynamic> constraints);
+  Future<RTCSessionDescription> createOffer([Map<String, dynamic> constraints]);
 
-  Future<RTCSessionDescription> createAnswer(Map<String, dynamic> constraints);
+  Future<RTCSessionDescription> createAnswer(
+      [Map<String, dynamic> constraints]);
 
   Future<void> addStream(MediaStream stream);
 
@@ -92,20 +95,21 @@ abstract class RTCPeerConnection {
   RTCDTMFSender createDtmfSender(MediaStreamTrack track);
 
   /// Unified-Plan.
-  List<RTCRtpSender> get senders;
+  Future<List<RTCRtpSender>> getSenders();
 
-  List<RTCRtpReceiver> get receivers;
+  Future<List<RTCRtpSender>> get senders => getSenders();
 
-  List<RTCRtpTransceiver> get transceivers;
+  Future<List<RTCRtpReceiver>> getReceivers();
 
-  Future<RTCRtpSender> createSender(String kind, String streamId);
+  Future<List<RTCRtpReceiver>> get receivers => getReceivers();
 
-  Future<RTCRtpSender> addTrack(MediaStreamTrack track,
-      [List<MediaStream> streams]);
+  Future<List<RTCRtpTransceiver>> getTransceivers();
+
+  Future<List<RTCRtpTransceiver>> get transceivers => getTransceivers();
+
+  Future<RTCRtpSender> addTrack(MediaStreamTrack track, [MediaStream stream]);
 
   Future<bool> removeTrack(RTCRtpSender sender);
-
-  Future<bool> closeSender(RTCRtpSender sender);
 
   /// 'audio|video', { 'direction': 'recvonly|sendonly|sendrecv' }
   Future<RTCRtpTransceiver> addTransceiver(

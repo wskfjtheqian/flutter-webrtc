@@ -265,7 +265,12 @@ typedef void (^NavigatorUserMediaSuccessCallback)(RTCMediaStream *mediaStream);
     self._targetHeight = 720;
     self._targetFps = 30;
     
-    id mandatory = videoConstraints[@"mandatory"];
+    if (!videoDevice && [constraints[@"video"] boolValue] == YES) {
+        videoDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    }
+    
+    id mandatory = [videoConstraints isKindOfClass:[NSDictionary class]]? videoConstraints[@"mandatory"] : nil ;
+
     // constraints.video.mandatory
     if(mandatory && [mandatory isKindOfClass:[NSDictionary class]])
     {
@@ -369,40 +374,66 @@ typedef void (^NavigatorUserMediaSuccessCallback)(RTCMediaStream *mediaStream);
         });
         return;
     }
-    
-    [AVCaptureDevice
-     requestAccessForMediaType:mediaType
-     completionHandler:^ (BOOL granted) {
-         dispatch_async(dispatch_get_main_queue(), ^ {
-             if (granted) {
-                 NavigatorUserMediaSuccessCallback scb
-                 = ^ (RTCMediaStream *mediaStream) {
-                     [self getUserMedia:constraints
-                        successCallback:successCallback
-                          errorCallback:errorCallback
-                            mediaStream:mediaStream];
-                 };
-                 
-                 if (mediaType == AVMediaTypeAudio) {
-                     [self getUserAudio:constraints
-                        successCallback:scb
-                          errorCallback:errorCallback
-                            mediaStream:mediaStream];
-                 } else if (mediaType == AVMediaTypeVideo) {
-                     [self getUserVideo:constraints
-                        successCallback:scb
-                          errorCallback:errorCallback
-                            mediaStream:mediaStream];
-                 }
-             } else {
-                 // According to step 10 Permission Failure of the getUserMedia()
-                 // algorithm, if the user has denied permission, fail "with a new
-                 // DOMException object whose name attribute has the value
-                 // NotAllowedError."
-                 errorCallback(@"DOMException", @"NotAllowedError");
-             }
-         });
-     }];
+
+#if TARGET_OS_OSX
+    if (@available(macOS 10.14, *)) {
+#endif
+        [AVCaptureDevice
+         requestAccessForMediaType:mediaType
+         completionHandler:^ (BOOL granted) {
+            dispatch_async(dispatch_get_main_queue(), ^ {
+                if (granted) {
+                    NavigatorUserMediaSuccessCallback scb
+                    = ^ (RTCMediaStream *mediaStream) {
+                        [self getUserMedia:constraints
+                           successCallback:successCallback
+                             errorCallback:errorCallback
+                               mediaStream:mediaStream];
+                    };
+                    
+                    if (mediaType == AVMediaTypeAudio) {
+                        [self getUserAudio:constraints
+                           successCallback:scb
+                             errorCallback:errorCallback
+                               mediaStream:mediaStream];
+                    } else if (mediaType == AVMediaTypeVideo) {
+                        [self getUserVideo:constraints
+                           successCallback:scb
+                             errorCallback:errorCallback
+                               mediaStream:mediaStream];
+                    }
+                } else {
+                    // According to step 10 Permission Failure of the getUserMedia()
+                    // algorithm, if the user has denied permission, fail "with a new
+                    // DOMException object whose name attribute has the value
+                    // NotAllowedError."
+                    errorCallback(@"DOMException", @"NotAllowedError");
+                }
+            });
+        }];
+#if TARGET_OS_OSX
+    } else {
+        // Fallback on earlier versions
+        NavigatorUserMediaSuccessCallback scb
+        = ^ (RTCMediaStream *mediaStream) {
+            [self getUserMedia:constraints
+               successCallback:successCallback
+                 errorCallback:errorCallback
+                   mediaStream:mediaStream];
+        };
+        if (mediaType == AVMediaTypeAudio) {
+            [self getUserAudio:constraints
+               successCallback:scb
+                 errorCallback:errorCallback
+                   mediaStream:mediaStream];
+        } else if (mediaType == AVMediaTypeVideo) {
+            [self getUserVideo:constraints
+               successCallback:scb
+                 errorCallback:errorCallback
+                   mediaStream:mediaStream];
+        }
+    }
+#endif
 }
 
 #if TARGET_OS_IPHONE
@@ -563,7 +594,7 @@ typedef void (^NavigatorUserMediaSuccessCallback)(RTCMediaStream *mediaStream);
         return;
     }
 
-    FlutterRTCFrameCapturer *capturer = [[FlutterRTCFrameCapturer alloc] initWithTrack:track toPath:path result:result];
+    self.frameCapturer = [[FlutterRTCFrameCapturer alloc] initWithTrack:track toPath:path result:result];
 }
 
 -(void)mediaStreamTrackStop:(RTCMediaStreamTrack *)track

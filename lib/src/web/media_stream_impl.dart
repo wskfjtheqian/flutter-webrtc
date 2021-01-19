@@ -33,26 +33,41 @@ class MediaStreamWeb extends MediaStream {
   }
 
   @override
-  List<MediaStreamTrack> getAudioTracks() => jsStream
-      .getAudioTracks()
-      .map((jsTrack) => MediaStreamTrackWeb(jsTrack))
-      .toList();
+  List<MediaStreamTrack> getAudioTracks() {
+    var audioTracks = <MediaStreamTrack>[];
+    jsStream
+        .getAudioTracks()
+        .forEach((jsTrack) => audioTracks.add(MediaStreamTrackWeb(jsTrack)));
+    return audioTracks;
+  }
 
   @override
-  List<MediaStreamTrack> getVideoTracks() => jsStream
-      .getVideoTracks()
-      .map((jsTrack) => MediaStreamTrackWeb(jsTrack))
-      .toList();
+  List<MediaStreamTrack> getVideoTracks() {
+    var audioTracks = <MediaStreamTrack>[];
+    jsStream
+        .getVideoTracks()
+        .forEach((jsTrack) => audioTracks.add(MediaStreamTrackWeb(jsTrack)));
+    return audioTracks;
+  }
 
   @override
   Future<void> dispose() async {
-    jsStream.getAudioTracks().forEach((track) => track.stop());
-    jsStream.getVideoTracks().forEach((track) => track.stop());
+    getTracks().forEach((element) {
+      element.dispose();
+    });
     return super.dispose();
   }
 
   @override
   List<MediaStreamTrack> getTracks() {
     return <MediaStreamTrack>[...getAudioTracks(), ...getVideoTracks()];
+  }
+
+  @override
+  bool get active => jsStream.active;
+
+  @override
+  MediaStream clone() {
+    return MediaStreamWeb(jsStream.clone(), ownerTag);
   }
 }
