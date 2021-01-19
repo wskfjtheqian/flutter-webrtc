@@ -121,7 +121,7 @@ class _GetUserMediaSampleState extends State<GetUserMediaSample> {
     await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-              content: Image.network(frame, height: 720, width: 1280),
+              content: Image.memory(frame.asUint8List(), height: 720, width: 1280),
               actions: <Widget>[
                 FlatButton(
                   child: Text('OK'),

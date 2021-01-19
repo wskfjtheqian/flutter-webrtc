@@ -20,14 +20,16 @@ class RTCVideoView extends StatefulWidget {
   final RTCVideoViewObjectFit objectFit;
   final bool mirror;
   final FilterQuality filterQuality;
+
   @override
   _RTCVideoViewState createState() => _RTCVideoViewState();
 }
 
 class _RTCVideoViewState extends State<RTCVideoView> {
   _RTCVideoViewState();
-  RTCVideoRendererWeb get videoRenderer =>
-      widget._renderer.delegate as RTCVideoRendererWeb;
+
+  RTCVideoRendererWeb get videoRenderer => widget._renderer.delegate as RTCVideoRendererWeb;
+
   @override
   void initState() {
     super.initState();
@@ -38,26 +40,22 @@ class _RTCVideoViewState extends State<RTCVideoView> {
 
   Widget buildVideoElementView(RTCVideoViewObjectFit objFit, bool mirror) {
     videoRenderer.mirror = mirror;
-    videoRenderer.objectFit =
-        objFit == RTCVideoViewObjectFit.RTCVideoViewObjectFitContain
-            ? 'contain'
-            : 'cover';
-    return HtmlElementView(
-        viewType: 'RTCVideoRenderer-${videoRenderer.textureId}');
+    videoRenderer.objectFit = objFit == RTCVideoViewObjectFit.RTCVideoViewObjectFitContain ? 'contain' : 'cover';
+    return HtmlElementView(viewType: 'RTCVideoRenderer-${videoRenderer.textureId}');
   }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-      return Center(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        return Center(
           child: Container(
-        width: constraints.maxWidth,
-        height: constraints.maxHeight,
-        child: widget._renderer.renderVideo
-            ? buildVideoElementView(widget.objectFit, widget.mirror)
-            : Container(),
-      ));
-    });
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            child: widget._renderer.renderVideo ? buildVideoElementView(widget.objectFit, widget.mirror) : Container(),
+          ),
+        );
+      },
+    );
   }
 }

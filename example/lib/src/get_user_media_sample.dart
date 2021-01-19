@@ -137,19 +137,21 @@ class _GetUserMediaSampleState extends State<GetUserMediaSample> {
   }
 
   void _captureFrame() async {
-    String filePath;
-    if (Platform.isAndroid) {
-      final storagePath = await getExternalStorageDirectory();
-      filePath = storagePath.path + '/webrtc_sample/test.jpg';
-    } else {
-      final storagePath = await getApplicationDocumentsDirectory();
-      filePath = storagePath.path + '/test${DateTime.now()}.jpg';
-    }
-
     final videoTrack = _localStream
         .getVideoTracks()
         .firstWhere((track) => track.kind == 'video');
-    await videoTrack.captureFrame(filePath);
+    final frame = await videoTrack.captureFrame();
+    await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          content: Image.memory(frame.asUint8List(), height: 720, width: 1280),
+          actions: <Widget>[
+            FlatButton(
+              child: Text('OK'),
+              onPressed: Navigator.of(context, rootNavigator: true).pop,
+            )
+          ],
+        ));
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:html' as html;
 import 'dart:js_util' as js;
+import 'dart:typed_data';
 
 import '../interface/media_stream_track.dart';
 
@@ -58,18 +59,18 @@ class MediaStreamTrackWeb extends MediaStreamTrack {
   // }
 
   @override
-  Future<dynamic> captureFrame([String filePath]) async {
+  Future<ByteBuffer> captureFrame() async {
     final imageCapture = html.ImageCapture(jsTrack);
     final bitmap = await imageCapture.grabFrame();
     final html.CanvasElement canvas = html.Element.canvas();
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
-    final html.ImageBitmapRenderingContext renderer =
-        canvas.getContext('bitmaprenderer');
+    final html.ImageBitmapRenderingContext renderer = canvas.getContext('bitmaprenderer');
     renderer.transferFromImageBitmap(bitmap);
-    final dataUrl = canvas.toDataUrl();
+    final blod = await canvas.toBlob();
+    var array = await js.promiseToFuture(js.callMethod(blod, 'arrayBuffer', []));
     bitmap.close();
-    return dataUrl;
+    return array;
   }
 
   @override

@@ -98,7 +98,7 @@ class GetUserMediaImpl {
 
     static final String TAG = FlutterWebRTCPlugin.TAG;
 
-    private final Map<String, VideoCapturer> mVideoCapturers = new HashMap<>();
+    private final Map<String, VideoCapturerInfo> mVideoCapturers = new HashMap<>();
 
     private final StateProvider stateProvider;
     private final Context applicationContext;
@@ -213,7 +213,7 @@ class GetUserMediaImpl {
 
     static private void resultError(String method, String error, Result result) {
         String errorMsg = method + "(): " + error;
-        result.error(method, errorMsg,null);
+        result.error(method, errorMsg, null);
         Log.d(TAG, errorMsg);
     }
 
@@ -491,15 +491,17 @@ class GetUserMediaImpl {
                         WindowManager wm =
                                 (WindowManager) applicationContext.getSystemService(Context.WINDOW_SERVICE);
 
-                        int width = wm.getDefaultDisplay().getWidth();
-                        int height = wm.getDefaultDisplay().getHeight();
-                        int fps = DEFAULT_FPS;
+                        VideoCapturerInfo info = new VideoCapturerInfo();
+                        info.width = wm.getDefaultDisplay().getWidth();
+                        info.height = wm.getDefaultDisplay().getHeight();
+                        info.fps = DEFAULT_FPS;
+                        info.capturer = videoCapturer;
 
-                        videoCapturer.startCapture(width, height, fps);
-                        Log.d(TAG, "ScreenCapturerAndroid.startCapture: " + width + "x" + height + "@" + fps);
+                        videoCapturer.startCapture(info.width, info.height, info.fps);
+                        Log.d(TAG, "ScreenCapturerAndroid.startCapture: " + info.width + "x" + info.height + "@" + info.fps);
 
                         String trackId = stateProvider.getNextTrackUUID();
-                        mVideoCapturers.put(trackId, videoCapturer);
+                        mVideoCapturers.put(trackId, info);
 
                         tracks[0] = pcFactory.createVideoTrack(trackId, videoSource);
 
@@ -674,40 +676,40 @@ class GetUserMediaImpl {
         videoCapturer.initialize(
                 surfaceTextureHelper, applicationContext, videoSource.getCapturerObserver());
 
-        // Fall back to defaults if keys are missing.
-        int width =
+        VideoCapturerInfo info = new VideoCapturerInfo();
+        info.width =
                 videoConstraintsMandatory != null && videoConstraintsMandatory.hasKey("minWidth")
                         ? videoConstraintsMandatory.getInt("minWidth")
                         : DEFAULT_WIDTH;
-        int height =
+        info.height =
                 videoConstraintsMandatory != null && videoConstraintsMandatory.hasKey("minHeight")
                         ? videoConstraintsMandatory.getInt("minHeight")
                         : DEFAULT_HEIGHT;
-        int fps =
+        info.fps =
                 videoConstraintsMandatory != null && videoConstraintsMandatory.hasKey("minFrameRate")
                         ? videoConstraintsMandatory.getInt("minFrameRate")
                         : DEFAULT_FPS;
-
-        videoCapturer.startCapture(width, height, fps);
+        info.capturer = videoCapturer;
+        videoCapturer.startCapture(info.width, info.height, info.fps);
 
         String trackId = stateProvider.getNextTrackUUID();
-        mVideoCapturers.put(trackId, videoCapturer);
+        mVideoCapturers.put(trackId, info);
 
-        Log.d(TAG, "changeCaptureFormat: " + width + "x" + height + "@" + fps);
-        videoSource.adaptOutputFormat(width, height, fps);
+        Log.d(TAG, "changeCaptureFormat: " + info.width + "x" + info.height + "@" + info.fps);
+        videoSource.adaptOutputFormat(info.width, info.height, info.fps);
 
         return pcFactory.createVideoTrack(trackId, videoSource);
     }
 
     void removeVideoCapturer(String id) {
-        VideoCapturer videoCapturer = mVideoCapturers.get(id);
-        if (videoCapturer != null) {
+        VideoCapturerInfo info = mVideoCapturers.get(id);
+        if (info != null) {
             try {
-                videoCapturer.stopCapture();
+                info.capturer.stopCapture();
             } catch (InterruptedException e) {
                 Log.e(TAG, "removeVideoCapturer() Failed to stop video capturer");
             } finally {
-                videoCapturer.dispose();
+                info.capturer.dispose();
                 mVideoCapturers.remove(id);
             }
         }
@@ -755,13 +757,13 @@ class GetUserMediaImpl {
     }
 
     void switchCamera(String id, Result result) {
-        VideoCapturer videoCapturer = mVideoCapturers.get(id);
-        if (videoCapturer == null) {
+        VideoCapturerInfo info = mVideoCapturers.get(id);
+        if (info == null) {
             resultError("switchCamera", "Video capturer not found for id: " + id, result);
             return;
         }
 
-        CameraVideoCapturer cameraVideoCapturer = (CameraVideoCapturer) videoCapturer;
+        CameraVideoCapturer cameraVideoCapturer = (CameraVideoCapturer) info.capturer;
         cameraVideoCapturer.switchCamera(
                 new CameraVideoCapturer.CameraSwitchHandler() {
                     @Override
@@ -820,23 +822,23 @@ class GetUserMediaImpl {
     }
 
     void hasTorch(String trackId, Result result) {
-        VideoCapturer videoCapturer = mVideoCapturers.get(trackId);
-        if (videoCapturer == null) {
+        VideoCapturerInfo info = mVideoCapturers.get(trackId);
+        if (info == null) {
             resultError("hasTorch", "Video capturer not found for id: " + trackId, result);
             return;
         }
 
-        if (VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP && videoCapturer instanceof Camera2Capturer) {
+        if (VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP && info.capturer instanceof Camera2Capturer) {
             CameraManager manager;
             CameraDevice cameraDevice;
 
             try {
                 Object session =
                         getPrivateProperty(
-                                Camera2Capturer.class.getSuperclass(), videoCapturer, "currentSession");
+                                Camera2Capturer.class.getSuperclass(), info.capturer, "currentSession");
                 manager =
                         (CameraManager)
-                                getPrivateProperty(Camera2Capturer.class, videoCapturer, "cameraManager");
+                                getPrivateProperty(Camera2Capturer.class, info.capturer, "cameraManager");
                 cameraDevice =
                         (CameraDevice) getPrivateProperty(session.getClass(), session, "cameraDevice");
             } catch (NoSuchFieldWithNameException e) {
@@ -859,13 +861,13 @@ class GetUserMediaImpl {
             return;
         }
 
-        if (videoCapturer instanceof Camera1Capturer) {
+        if (info.capturer instanceof Camera1Capturer) {
             Camera camera;
 
             try {
                 Object session =
                         getPrivateProperty(
-                                Camera1Capturer.class.getSuperclass(), videoCapturer, "currentSession");
+                                Camera1Capturer.class.getSuperclass(), info.capturer, "currentSession");
                 camera = (Camera) getPrivateProperty(session.getClass(), session, "camera");
             } catch (NoSuchFieldWithNameException e) {
                 // Most likely the upstream Camera1Capturer class have changed
@@ -886,13 +888,13 @@ class GetUserMediaImpl {
 
     @RequiresApi(api = VERSION_CODES.LOLLIPOP)
     void setTorch(String trackId, boolean torch, Result result) {
-        VideoCapturer videoCapturer = mVideoCapturers.get(trackId);
-        if (videoCapturer == null) {
+        VideoCapturerInfo info = mVideoCapturers.get(trackId);
+        if (info == null) {
             resultError("setTorch", "Video capturer not found for id: " + trackId, result);
             return;
         }
 
-        if (videoCapturer instanceof Camera2Capturer) {
+        if (info.capturer instanceof Camera2Capturer) {
             CameraCaptureSession captureSession;
             CameraDevice cameraDevice;
             CaptureFormat captureFormat;
@@ -903,10 +905,10 @@ class GetUserMediaImpl {
             try {
                 Object session =
                         getPrivateProperty(
-                                Camera2Capturer.class.getSuperclass(), videoCapturer, "currentSession");
+                                Camera2Capturer.class.getSuperclass(), info.capturer, "currentSession");
                 CameraManager manager =
                         (CameraManager)
-                                getPrivateProperty(Camera2Capturer.class, videoCapturer, "cameraManager");
+                                getPrivateProperty(Camera2Capturer.class, info.capturer, "cameraManager");
                 captureSession =
                         (CameraCaptureSession)
                                 getPrivateProperty(session.getClass(), session, "captureSession");
@@ -950,12 +952,12 @@ class GetUserMediaImpl {
             return;
         }
 
-        if (videoCapturer instanceof Camera1Capturer) {
+        if (info.capturer instanceof Camera1Capturer) {
             Camera camera;
             try {
                 Object session =
                         getPrivateProperty(
-                                Camera1Capturer.class.getSuperclass(), videoCapturer, "currentSession");
+                                Camera1Capturer.class.getSuperclass(), info.capturer, "currentSession");
                 camera = (Camera) getPrivateProperty(session.getClass(), session, "camera");
             } catch (NoSuchFieldWithNameException e) {
                 // Most likely the upstream Camera1Capturer class have changed
@@ -998,5 +1000,28 @@ class GetUserMediaImpl {
             this.className = className;
             this.fieldName = fieldName;
         }
+    }
+
+    public void reStartCamera(IsCameraEnabled getCameraId) {
+        for (Map.Entry<String, VideoCapturerInfo> item : mVideoCapturers.entrySet()) {
+            if (getCameraId.isEnabled(item.getKey())) {
+                item.getValue().capturer.startCapture(
+                        item.getValue().width,
+                        item.getValue().height,
+                        item.getValue().fps
+                );
+            }
+        }
+    }
+
+    public interface IsCameraEnabled {
+        boolean isEnabled(String id);
+    }
+
+    public class VideoCapturerInfo {
+        VideoCapturer capturer;
+        int width;
+        int height;
+        int fps;
     }
 }
