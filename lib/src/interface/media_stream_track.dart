@@ -117,7 +117,7 @@ abstract class MediaStreamTrack {
 }
 
 // TODO(wermathurin): Need to implement missing API
-
 // readonly attribute MediaStreamTrackState readyState;
 // MediaTrackCapabilities getCapabilities();
 // MediaTrackSettings getSettings();
+
