@@ -16,12 +16,13 @@ class RTCRtpReceiverWeb extends RTCRtpReceiver {
 
   @override
   Future<List<StatsReport>> getStats() async {
-    var stats = await jsutil.promiseToFuture<dynamic>(
-        jsutil.callMethod(_jsRtpReceiver, 'getStats', []));
+    var stats = await jsutil.promiseToFuture<dynamic>(jsutil.callMethod(_jsRtpReceiver, 'getStats', []));
     var report = <StatsReport>[];
+    print(stats);
     stats.forEach((key, value) {
-      report.add(
-          StatsReport(value['id'], value['type'], value['timestamp'], value));
+      print(key);
+      print(value);
+      report.add(StatsReport(value['id'], value['type'], value['timestamp'], value));
     });
     return report;
   }
