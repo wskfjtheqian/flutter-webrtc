@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../interface/enums.dart';
@@ -41,7 +43,12 @@ class _RTCVideoViewState extends State<RTCVideoView> {
   Widget buildVideoElementView(RTCVideoViewObjectFit objFit, bool mirror) {
     videoRenderer.mirror = mirror;
     videoRenderer.objectFit = objFit == RTCVideoViewObjectFit.RTCVideoViewObjectFitContain ? 'contain' : 'cover';
-    return HtmlElementView(viewType: 'RTCVideoRenderer-${videoRenderer.textureId}');
+
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.rotationY(videoRenderer.mirror ? pi * -1 : 0),
+      child: HtmlElementView(viewType: 'RTCVideoRenderer-${videoRenderer.textureId}'),
+    );
   }
 
   @override

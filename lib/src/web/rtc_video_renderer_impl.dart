@@ -38,19 +38,30 @@ class RTCVideoRendererWeb extends VideoRenderer {
 
   static int _textureCounter = 1;
 
-  final int _textureId;
-
   MediaStreamWeb _videoStream;
 
   MediaStreamWeb _audioStream;
 
   MediaStream _srcObject;
 
+  final int _textureId;
+
+  bool _mirror = false;
+
   final _subscriptions = <StreamSubscription>[];
 
-  set objectFit(String fit) => findHtmlView()?.style?.objectFit = fit;
+  String _objectFit = 'contain';
 
-  set mirror(bool mirror) => findHtmlView()?.style?.transform = 'rotateY(${mirror ? "180" : "0"}deg)';
+  bool _muted = false;
+
+  set objectFit(String fit) => findHtmlView()?.style?.objectFit = _objectFit = fit;
+
+  bool get mirror => _mirror;
+
+  set mirror(bool mirror) {
+    _mirror = mirror;
+    notifyListeners();
+  }
 
   @override
   int get videoWidth => value.width.toInt();
@@ -61,11 +72,12 @@ class RTCVideoRendererWeb extends VideoRenderer {
   @override
   int get textureId => _textureId;
 
-  @override
-  bool get muted => findHtmlView()?.muted ?? true;
 
   @override
-  set muted(bool mute) => findHtmlView()?.muted = mute;
+  bool get muted => _muted;
+
+  @override
+  set muted(bool mute) => findHtmlView()?.muted = _muted = mute;
 
   @override
   bool get renderVideo => _srcObject != null;
@@ -88,13 +100,17 @@ class RTCVideoRendererWeb extends VideoRenderer {
     _srcObject = stream;
 
     if (null != stream) {
-      if (stream.getVideoTracks().isNotEmpty) {
+      if (stream
+          .getVideoTracks()
+          .isNotEmpty) {
         _videoStream = MediaStreamWeb(html.MediaStream(), stream.ownerTag);
         stream.getVideoTracks().forEach((element) {
           _videoStream.addTrack(element);
         });
       }
-      if (stream.getAudioTracks().isNotEmpty) {
+      if (stream
+          .getAudioTracks()
+          .isNotEmpty) {
         _audioStream = MediaStreamWeb(html.MediaStream(), stream.ownerTag);
         stream.getVideoTracks().forEach((element) {
           _audioStream.addTrack(element);
@@ -133,11 +149,15 @@ class RTCVideoRendererWeb extends VideoRenderer {
   }
 
   html.VideoElement findHtmlView() {
+    var video = html.document.getElementById('video_RTCVideoRenderer-$textureId');
+    if (null != value) {
+      return video;
+    }
     final fltPv = html.document.getElementsByTagName('flt-platform-view');
     if (fltPv.isEmpty) return null;
     var child = (fltPv.first as html.Element).shadowRoot.childNodes;
     for (var item in child) {
-      if ((item as html.Element).id == "video_RTCVideoRenderer-$textureId") {
+      if ((item as html.Element).id == 'video_RTCVideoRenderer-$textureId') {
         return item;
       }
     }
@@ -181,9 +201,9 @@ class RTCVideoRendererWeb extends VideoRenderer {
 
       var element = html.VideoElement()
         ..autoplay = true
-        ..muted = false
+        ..muted = _muted
         ..controls = false
-        ..style.objectFit = 'contain'
+        ..style.objectFit = _objectFit
         ..style.border = 'none'
         ..srcObject = _videoStream.jsStream
         ..id = "video_$id"
